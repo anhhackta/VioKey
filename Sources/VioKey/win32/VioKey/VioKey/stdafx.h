@@ -74,9 +74,11 @@ extern int vTempOffSpelling;
 extern int vAllowConsonantZFWJ;
 extern int vQuickStartConsonant;
 extern int vQuickEndConsonant;
-extern int vTempOffOpenKey;
+extern int vTempOffVioKey;
 
 extern int vUseGrayIcon;
 extern int vShowOnStartUp;
 extern int vRunWithWindows;
 extern int vRunAsAdmin;
+extern int vThemeMode;
+extern bool gHookPaused;

@@ -51,6 +51,9 @@ static vector<Byte> savedSmartSwitchKeyData; //use for smart switch key
 
 static bool _hasJustUsedHotKey = false;
 
+// Set while the settings window records a new hotkey, so keys reach it untouched.
+bool gHookPaused = false;
+
 static INPUT backspaceEvent[2];
 static INPUT keyEvent[2];
 
@@ -70,25 +73,26 @@ void VioKeyInit() {
 	APP_GET_DATA(vCheckSpelling, 1);
 	APP_GET_DATA(vUseModernOrthography, 1);
 	APP_GET_DATA(vQuickTelex, 0);
-	APP_GET_DATA(vSwitchKeyStatus, 0x7A000206);
+	APP_GET_DATA(vSwitchKeyStatus, 0x5A00025A);
 	APP_GET_DATA(vRestoreIfWrongSpelling, 1);
-	APP_GET_DATA(vFixRecommendBrowser, 1);
+	APP_GET_DATA(vFixRecommendBrowser, 0);
 	APP_GET_DATA(vUseMacro, 1);
-	APP_GET_DATA(vUseMacroInEnglishMode, 0);
+	APP_GET_DATA(vUseMacroInEnglishMode, 1);
 	APP_GET_DATA(vAutoCapsMacro, 0);
 	APP_GET_DATA(vSendKeyStepByStep, 1);
+	APP_GET_DATA(vUseSmartSwitchKey, 1);
+	APP_GET_DATA(vUpperCaseFirstChar, 0);
+	APP_GET_DATA(vTempOffSpelling, 0);
+	APP_GET_DATA(vAllowConsonantZFWJ, 0);
+	APP_GET_DATA(vQuickStartConsonant, 0);
+	APP_GET_DATA(vQuickEndConsonant, 0);
+	APP_GET_DATA(vTempOffVioKey, 0);
 	APP_GET_DATA(vUseGrayIcon, 0);
 	APP_GET_DATA(vShowOnStartUp, 0);
 	APP_GET_DATA(vRunWithWindows, 1);
-	VioKeyHelper::registerRunOnStartup(vRunWithWindows);
-	APP_GET_DATA(vUseSmartSwitchKey, 1);
-	APP_GET_DATA(vUpperCaseFirstChar, 0);
-	APP_GET_DATA(vAllowConsonantZFWJ, 0);
-	APP_GET_DATA(vTempOffSpelling, 0);
-	APP_GET_DATA(vQuickStartConsonant, 0);
-	APP_GET_DATA(vQuickEndConsonant, 0);
 	APP_GET_DATA(vRunAsAdmin, 0);
-	APP_GET_DATA(vTempOffOpenKey, 0);
+	APP_GET_DATA(vThemeMode, 0);
+	VioKeyHelper::registerRunOnStartup(vRunWithWindows);
 
 	pData = (vKeyHookState*)vKeyInit();
 
@@ -378,6 +382,12 @@ LRESULT CALLBACK keyboardHookProcess(int nCode, WPARAM wParam, LPARAM lParam) {
 	} else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
 		UnsetModifierMask((Uint16)keyboardData->vkCode);
 	}
+	//keep modifier state in sync, but let the settings window receive the raw hotkey
+	if (gHookPaused) {
+		_keycode = 0;
+		_lastFlag = 0;
+		return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
+	}
 	if (!_isFlagKey && wParam != WM_KEYUP && wParam != WM_SYSKEYUP)
 		_keycode = (Uint16)keyboardData->vkCode;
 
@@ -407,7 +417,7 @@ LRESULT CALLBACK keyboardHookProcess(int nCode, WPARAM wParam, LPARAM lParam) {
 			if (vTempOffSpelling && !_hasJustUsedHotKey && _lastFlag & MASK_CONTROL) {
 				vTempOffSpellChecking();
 			}
-			if (vTempOffOpenKey && !_hasJustUsedHotKey && _lastFlag & MASK_ALT) {
+			if (vTempOffVioKey && !_hasJustUsedHotKey && _lastFlag & MASK_ALT) {
 				vTempOffEngine();
 			}
 			_lastFlag = _flag;

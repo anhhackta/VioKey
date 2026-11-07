@@ -1,4 +1,4 @@
-//
+﻿//
 //  Vietnamese.h
 //  VioKey - Vietnamese Input Engine
 //

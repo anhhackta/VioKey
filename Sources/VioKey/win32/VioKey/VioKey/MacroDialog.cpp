@@ -1,13 +1,10 @@
 ﻿/*----------------------------------------------------------
-OpenKey - The Cross platform Open source Vietnamese Keyboard application.
+VioKey - Vietnamese Input Application for Windows.
 
-Copyright (C) 2019 Mai Vu Tuyen
-Contact: maivutuyen.91@gmail.com
-Github: https://github.com/tuyenvm/OpenKey
-Fanpage: https://www.facebook.com/OpenKeyVN
+Based on OpenKey (https://github.com/tuyenvm/OpenKey)
+Copyright (C) 2019 Mai Vu Tuyen - GPL license
 
-This file is belong to the OpenKey project, Win32 version
-which is released under GPL license.
+VioKey is a simplified fork: Telex/VNI only, Unicode only.
 You can fork, modify, improve this program. If you
 redistribute your new version, it MUST be open source.
 -----------------------------------------------------------*/
@@ -36,7 +33,6 @@ INT_PTR MacroDialog::eventProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_COMMAND: {
 		int wmId = LOWORD(wParam);
 		switch (wmId) {
-		case IDOK:
 		case IDBUTTON_OK:
 			AppDelegate::getInstance()->closeDialog(this);
 			break;
@@ -99,15 +95,15 @@ void MacroDialog::initDialog() {
 	LVCOLUMN LvCol;
 	memset(&LvCol, 0, sizeof(LvCol));
 	LvCol.mask = LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
-	LvCol.pszText = (LPWSTR)L"Macro Name";
-	LvCol.cx = 165;
+	LvCol.pszText = (LPWSTR)_T("Từ viết tắt");
+	LvCol.cx = 130;
 	
-	SendMessage(listMacro, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT); // Set style
-	SendMessage(listMacro, LVM_INSERTCOLUMN, 0, (LPARAM)&LvCol); //macro name column
+	SendMessage(listMacro, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+	SendMessage(listMacro, LVM_INSERTCOLUMN, 0, (LPARAM)&LvCol);
 
-	LvCol.pszText = (LPWSTR)L"Macro Content";  
-	LvCol.cx = 695;
-	SendMessage(listMacro, LVM_INSERTCOLUMN, 1, (LPARAM)&LvCol); //macro content column
+	LvCol.pszText = (LPWSTR)_T("Nội dung đầy đủ");  
+	LvCol.cx = 390;
+	SendMessage(listMacro, LVM_INSERTCOLUMN, 1, (LPARAM)&LvCol);
 
 	fillData();
 }
@@ -126,7 +122,7 @@ void MacroDialog::saveAndReload() {
 	//save
 	vector<Byte> macroData;
 	getMacroSaveData(macroData);
-	OpenKeyHelper::setRegBinary(_T("macroData"), macroData.data(), (int)macroData.size());
+	VioKeyHelper::setRegBinary(_T("macroData"), macroData.data(), (int)macroData.size());
 
 	//reload data
 	fillData();
@@ -165,7 +161,7 @@ void MacroDialog::onAddMacroButton() {
 	wstring content = buffer;
 
 	if (name.compare(L"") == 0 || content.compare(L"") == 0) {
-		MessageBox(hDlg, _T("Bạn hãy nhập từ cần gõ tắt!"), _T("OpenKey"), MB_OK);
+		MessageBox(hDlg, _T("Bạn hãy nhập từ cần gõ tắt!"), _T("VioKey"), MB_OK);
 		return;
 	}
 
@@ -182,7 +178,7 @@ void MacroDialog::onDeleteMacroButton() {
 	wstring name = buffer;
 
 	if (name.compare(L"") == 0) {
-		MessageBox(hDlg, _T("Bạn hãy chọn từ cần xoá!"), _T("OpenKey"), MB_OK);
+		MessageBox(hDlg, _T("Bạn hãy chọn từ cần xoá!"), _T("VioKey"), MB_OK);
 		return;
 	}
 
@@ -225,7 +221,7 @@ void MacroDialog::onImportMacroButton() {
 
 void MacroDialog::onExportMacrobutton() {
 	OPENFILENAME ofn;
-	TCHAR szFile[MAX_PATH] = { 'O', 'p', 'e', 'n', 'K', 'e', 'y', 'M', 'a', 'c', 'r', 'o' };
+	TCHAR szFile[MAX_PATH] = { 'V', 'i', 'o', 'K', 'e', 'y', 'M', 'a', 'c', 'r', 'o' };
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = hDlg;

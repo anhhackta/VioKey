@@ -43,4 +43,5 @@ public: //event
 	void onControlPanel();
 	void onVioKeyAbout();
 	void onVioKeyExit();
+	void applyThemeToOpenDialogs();
 };

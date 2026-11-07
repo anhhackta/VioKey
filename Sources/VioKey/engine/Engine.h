@@ -1,4 +1,4 @@
-//
+﻿//
 //  Engine.h
 //  VioKey - Vietnamese Input Engine
 //
@@ -157,7 +157,7 @@ extern int vQuickEndConsonant;
  * 0: No; 1: Yes
  * Temporarily turn off VioKey by hot key (double tap Alt)
  */
-extern int vTempOffOpenKey;
+extern int vTempOffVioKey;
 
 /**
  * Call this function first to receive data pointer

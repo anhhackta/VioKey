@@ -1,4 +1,4 @@
-//
+﻿//
 //  Macro.h
 //  VioKey - Vietnamese Input Engine
 //

@@ -1,4 +1,12 @@
-# OpenKey Change Log
+# VioKey Change Log
+
+##### VioKey 1.0.0
+- Đổi tên dự án thành VioKey, chỉ còn bản Windows (bỏ macOS/Linux).
+- Chỉ giữ kiểu gõ Telex + VNI và bảng mã Unicode; bỏ Simple Telex, công cụ chuyển mã, tự cập nhật.
+- Engine: tra bảng mã O(1), bỏ `std::map` ở đường xử lý phím; gửi phím Unicode trực tiếp.
+- Giao diện tối mới: toggle switch, nút bo góc, tab dạng pill, title bar tối, bo góc Win11.
+
+# OpenKey Change Log (lịch sử gốc)
 
 ##### OpenKey for Linux: (in development)
 

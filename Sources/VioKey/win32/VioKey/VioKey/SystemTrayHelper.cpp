@@ -1,18 +1,16 @@
-﻿/*----------------------------------------------------------
-OpenKey - The Cross platform Open source Vietnamese Keyboard application.
+/*----------------------------------------------------------
+VioKey - Vietnamese Input Application for Windows.
 
-Copyright (C) 2019 Mai Vu Tuyen
-Contact: maivutuyen.91@gmail.com
-Github: https://github.com/tuyenvm/OpenKey
-Fanpage: https://www.facebook.com/OpenKeyVN
+Based on OpenKey (https://github.com/tuyenvm/OpenKey)
+Copyright (C) 2019 Mai Vu Tuyen - GPL license
 
-This file is belong to the OpenKey project, Win32 version
-which is released under GPL license.
+VioKey is a simplified fork: Telex/VNI only, Unicode only.
 You can fork, modify, improve this program. If you
 redistribute your new version, it MUST be open source.
 -----------------------------------------------------------*/
 #include "SystemTrayHelper.h"
 #include "AppDelegate.h"
+#include <map>
 
 #define WM_TRAYMESSAGE (WM_USER + 1)
 #define TRAY_ICONUID 100
@@ -24,53 +22,34 @@ redistribute your new version, it MUST be open source.
 
 #define POPUP_TELEX 910
 #define POPUP_VNI 911
-#define POPUP_SIMPLE_TELEX 912
-
-#define POPUP_UNICODE 930
-#define POPUP_TCVN3 931
-#define POPUP_VNI_WINDOWS 932
-#define POPUP_UNICODE_COMPOUND 933
-#define POPUP_VN_LOCALE_1258 934
-
-#define POPUP_CONVERT_TOOL 980
-#define POPUP_QUICK_CONVERT 981
 
 #define POPUP_MACRO_TABLE 990
 
 #define POPUP_CONTROL_PANEL 1000
-#define POPUP_ABOUT_OPENKEY 1010
-#define POPUP_OPENKEY_EXIT 2000
+#define POPUP_TOGGLE_THEME 1005
+#define POPUP_ABOUT_VIOKEY 1010
+#define POPUP_VIOKEY_EXIT 2000
 
-#define MODIFY_MENU(MENU, COMMAND, DATA) ModifyMenu(MENU, COMMAND, \
-											MF_BYCOMMAND | (DATA ? MF_CHECKED : MF_UNCHECKED), \
+#define MODIFY_MENU(COMMAND, DATA) ModifyMenu(popupMenu, COMMAND, \
+											MF_BYCOMMAND | ((DATA) ? MF_CHECKED : MF_UNCHECKED), \
 											COMMAND, \
-											menuData[COMMAND]);
+											menuData[COMMAND])
 
 static HMENU popupMenu;
-//static HMENU menuInputType;
-static HMENU otherCode;
-
 static NOTIFYICONDATA nid;
 
-map<UINT, LPCTSTR> menuData = {
+static std::map<UINT, LPCTSTR> menuData = {
 	{POPUP_VIET_ON_OFF, _T("Bật Tiếng Việt")},
 	{POPUP_SPELLING, _T("Bật kiểm tra chính tả")},
-	{POPUP_SMART_SWITCH, _T("Bật loại trừ ứng dụng thông minh")},
+	{POPUP_SMART_SWITCH, _T("Nhớ ngôn ngữ theo ứng dụng")},
 	{POPUP_USE_MACRO, _T("Bật gõ tắt")},
 	{POPUP_TELEX, _T("Kiểu gõ Telex")},
 	{POPUP_VNI, _T("Kiểu gõ VNI")},
-	{POPUP_SIMPLE_TELEX, _T("Kiểu gõ Simple Telex")},
-	{POPUP_UNICODE, _T("Unicode dựng sẵn")},
-	{POPUP_TCVN3, _T("TCVN3 (ABC)")},
-	{POPUP_VNI_WINDOWS, _T("VNI Windows")},
-	{POPUP_UNICODE_COMPOUND, _T("Unicode tổ hợp")},
-	{POPUP_VN_LOCALE_1258, _T("Vietnamese locale CP 1258")},
-	{POPUP_CONVERT_TOOL, _T("Công cụ chuyển mã...")},
-	{POPUP_QUICK_CONVERT, _T("Chuyển mã nhanh")},
 	{POPUP_MACRO_TABLE, _T("Cấu hình gõ tắt...")},
+	{POPUP_TOGGLE_THEME, _T("Giao diện Sáng / Tối")},
 	{POPUP_CONTROL_PANEL, _T("Bảng điều khiển...")},
-	{POPUP_ABOUT_OPENKEY, _T("Giới thiệu OpenKey")},
-	{POPUP_OPENKEY_EXIT, _T("Thoát")},
+	{POPUP_ABOUT_VIOKEY, _T("Giới thiệu VioKey")},
+	{POPUP_VIOKEY_EXIT, _T("Thoát")},
 };
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -119,50 +98,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			case POPUP_MACRO_TABLE:
 				AppDelegate::getInstance()->onMacroTable();
 				break;
-			case POPUP_CONVERT_TOOL:
-				AppDelegate::getInstance()->onConvertTool();
-				break;
-			case POPUP_QUICK_CONVERT:
-				AppDelegate::getInstance()->onQuickConvert();
-				break;
 			case POPUP_TELEX:
 				AppDelegate::getInstance()->onInputType(0);
 				break;
 			case POPUP_VNI:
 				AppDelegate::getInstance()->onInputType(1);
 				break;
-			case POPUP_SIMPLE_TELEX:
-				AppDelegate::getInstance()->onInputType(2);
-				break;
-			case POPUP_UNICODE:
-				AppDelegate::getInstance()->onTableCode(0);
-				break;
-			case POPUP_TCVN3:
-				AppDelegate::getInstance()->onTableCode(1);
-				break;
-			case POPUP_VNI_WINDOWS:
-				AppDelegate::getInstance()->onTableCode(2);
-				break;
-			case POPUP_UNICODE_COMPOUND:
-				AppDelegate::getInstance()->onTableCode(3);
-				break;
-			case POPUP_VN_LOCALE_1258:
-				AppDelegate::getInstance()->onTableCode(4);
-				break;
 			case POPUP_CONTROL_PANEL:
 				AppDelegate::getInstance()->onControlPanel();
 				break;
-			case POPUP_ABOUT_OPENKEY:
-				AppDelegate::getInstance()->onOpenKeyAbout();
+			case POPUP_TOGGLE_THEME:
+				UITheme::toggleDarkMode();
+				AppDelegate::getInstance()->applyThemeToOpenDialogs();
 				break;
-			case POPUP_OPENKEY_EXIT:
-				AppDelegate::getInstance()->onOpenKeyExit();
+			case POPUP_ABOUT_VIOKEY:
+				AppDelegate::getInstance()->onVioKeyAbout();
+				break;
+			case POPUP_VIOKEY_EXIT:
+				AppDelegate::getInstance()->onVioKeyExit();
+				break;
+			default:
 				break;
 			}
 			SystemTrayHelper::updateData();
 		}
+		break;
 	}
-	break;
 	default:
 		// if the taskbar is restarted, add the system tray icon again
 		if (message == taskbarCreated) {
@@ -188,7 +149,7 @@ HWND SystemTrayHelper::createFakeWindow(const HINSTANCE & hIns) {
 	wcex.lpszMenuName = NULL;
 	wcex.lpszClassName = APP_CLASS;
 	wcex.hIconSm = NULL;
-	ATOM atom = RegisterClassExW(&wcex);
+	RegisterClassExW(&wcex);
 	HWND hWnd = CreateWindowW(APP_CLASS, _T(""), WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hIns, nullptr);
 	if (!hWnd) {
@@ -208,33 +169,15 @@ void SystemTrayHelper::createPopupMenu() {
 	AppendMenu(popupMenu, MF_CHECKED, POPUP_USE_MACRO, menuData[POPUP_USE_MACRO]);
 	AppendMenu(popupMenu, MF_SEPARATOR, 0, 0);
 	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_MACRO_TABLE, menuData[POPUP_MACRO_TABLE]);
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_CONVERT_TOOL, menuData[POPUP_CONVERT_TOOL]);
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_QUICK_CONVERT, menuData[POPUP_QUICK_CONVERT]);
 	AppendMenu(popupMenu, MF_SEPARATOR, 0, 0);
-
-	//menuInputType = CreatePopupMenu();
 	AppendMenu(popupMenu, MF_CHECKED, POPUP_TELEX, menuData[POPUP_TELEX]);
 	AppendMenu(popupMenu, MF_CHECKED, POPUP_VNI, menuData[POPUP_VNI]);
-	AppendMenu(popupMenu, MF_CHECKED, POPUP_SIMPLE_TELEX, menuData[POPUP_SIMPLE_TELEX]);
-
-	//AppendMenu(popupMenu, MF_POPUP, (UINT_PTR)menuInputType, _T("Kiểu gõ"));
 	AppendMenu(popupMenu, MF_SEPARATOR, 0, 0);
-
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_UNICODE, menuData[POPUP_UNICODE]);
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_TCVN3, menuData[POPUP_TCVN3]);
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_VNI_WINDOWS, menuData[POPUP_VNI_WINDOWS]);
-
-	otherCode = CreatePopupMenu();
-	AppendMenu(otherCode, MF_CHECKED, POPUP_UNICODE_COMPOUND, menuData[POPUP_UNICODE_COMPOUND]);
-	AppendMenu(otherCode, MF_CHECKED, POPUP_VN_LOCALE_1258, menuData[POPUP_VN_LOCALE_1258]);
-	AppendMenu(popupMenu, MF_POPUP, (UINT_PTR)otherCode, _T("Bảng mã khác"));
-
-	AppendMenu(popupMenu, MF_SEPARATOR, 0, 0);
-
 	AppendMenu(popupMenu, MF_STRING, POPUP_CONTROL_PANEL, menuData[POPUP_CONTROL_PANEL]);
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_ABOUT_OPENKEY, menuData[POPUP_ABOUT_OPENKEY]);
+	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_TOGGLE_THEME, menuData[POPUP_TOGGLE_THEME]);
+	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_ABOUT_VIOKEY, menuData[POPUP_ABOUT_VIOKEY]);
 	AppendMenu(popupMenu, MF_SEPARATOR, 0, 0);
-	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_OPENKEY_EXIT, menuData[POPUP_OPENKEY_EXIT]);
+	AppendMenu(popupMenu, MF_UNCHECKED, POPUP_VIOKEY_EXIT, menuData[POPUP_VIOKEY_EXIT]);
 
 	SetMenuDefaultItem(popupMenu, POPUP_CONTROL_PANEL, false);
 }
@@ -249,74 +192,31 @@ static void loadTrayIcon() {
 		icon = vUseGrayIcon ? IDI_ICON_STATUS_ENG_10 : IDI_ICON_STATUS_ENG;
 		LoadString(GetModuleHandle(0), IDS_TRAY_TITLE, nid.szTip, 128);
 	}
-	nid.hIcon = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(icon));
+	int cx = GetSystemMetrics(SM_CXSMICON);
+	int cy = GetSystemMetrics(SM_CYSMICON);
+	nid.hIcon = (HICON)LoadImage(GetModuleHandle(0), MAKEINTRESOURCE(icon), IMAGE_ICON, cx, cy, LR_SHARED);
+	if (!nid.hIcon) {
+		nid.hIcon = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(icon));
+	}
 }
 
 void SystemTrayHelper::updateData() {
 	loadTrayIcon();
 	Shell_NotifyIcon(NIM_MODIFY, &nid);
 
-	MODIFY_MENU(popupMenu, POPUP_VIET_ON_OFF, vLanguage);
-	MODIFY_MENU(popupMenu, POPUP_SPELLING, vCheckSpelling);
-	MODIFY_MENU(popupMenu, POPUP_SMART_SWITCH, vUseSmartSwitchKey);
-	MODIFY_MENU(popupMenu, POPUP_USE_MACRO, vUseMacro);
-	MODIFY_MENU(popupMenu, POPUP_TELEX, vInputType == 0);
-	MODIFY_MENU(popupMenu, POPUP_VNI, vInputType == 1);
-	MODIFY_MENU(popupMenu, POPUP_SIMPLE_TELEX, vInputType == 2);
-	MODIFY_MENU(popupMenu, POPUP_UNICODE, vCodeTable == 0);
-	MODIFY_MENU(popupMenu, POPUP_TCVN3, vCodeTable == 1);
-	MODIFY_MENU(popupMenu, POPUP_VNI_WINDOWS, vCodeTable == 2);
-	MODIFY_MENU(otherCode, POPUP_UNICODE_COMPOUND, vCodeTable == 3);
-	MODIFY_MENU(otherCode, POPUP_VN_LOCALE_1258, vCodeTable == 4);
-
-	wstring hotkey = L"";
-	bool hasAdd = false;
-	if (convertToolHotKey & 0x100) {
-		hotkey += L"Ctrl";
-		hasAdd = true;
-	}
-	if (convertToolHotKey & 0x200) {
-		if (hasAdd)
-			hotkey += L" + ";
-		hotkey += L"Alt";
-		hasAdd = true;
-	}
-	if (convertToolHotKey & 0x400) {
-		if (hasAdd)
-			hotkey += L" + ";
-		hotkey += L"Win";
-		hasAdd = true;
-	}
-	if (convertToolHotKey & 0x800) {
-		if (hasAdd)
-			hotkey += L" + ";
-		hotkey += L"Shift";
-		hasAdd = true;
-	}
-
-	unsigned short k = ((convertToolHotKey >> 24) & 0xFF);
-	if (k != 0xFE) {
-		if (hasAdd)
-			hotkey += L" + ";
-		if (k == VK_SPACE)
-			hotkey += L"Space";
-		else
-			hotkey += (wchar_t)k;
-	}
-
-	wstring hotKeyString = menuData[POPUP_QUICK_CONVERT];
-	if (hasAdd) {
-		hotKeyString += L" - [";
-		hotKeyString += hotkey;
-		hotKeyString += L"]";
-	}
-	ModifyMenu(popupMenu, POPUP_QUICK_CONVERT, MF_BYCOMMAND | MF_UNCHECKED, POPUP_QUICK_CONVERT, hotKeyString.c_str());
+	MODIFY_MENU(POPUP_VIET_ON_OFF, vLanguage);
+	MODIFY_MENU(POPUP_SPELLING, vCheckSpelling);
+	MODIFY_MENU(POPUP_SMART_SWITCH, vUseSmartSwitchKey);
+	MODIFY_MENU(POPUP_USE_MACRO, vUseMacro);
+	MODIFY_MENU(POPUP_TELEX, vInputType == 0);
+	MODIFY_MENU(POPUP_VNI, vInputType == 1);
 }
 
 static HINSTANCE ins;
 static int recreateCount = 0;
 
 void SystemTrayHelper::_createSystemTrayIcon(const HINSTANCE& hIns) {
+	ins = hIns;
 	HWND hWnd = createFakeWindow(ins);
 	
 	if (hWnd == NULL) { //Use timer to create
@@ -324,7 +224,6 @@ void SystemTrayHelper::_createSystemTrayIcon(const HINSTANCE& hIns) {
 			PostQuitMessage(0);
 			return;
 		}
-		ins = hIns;
 		SetTimer(NULL, 0, 1000 * 3, (TIMERPROC)&WaitToCreateFakeWindow);
 		++recreateCount;
 		return;
@@ -338,7 +237,6 @@ void SystemTrayHelper::_createSystemTrayIcon(const HINSTANCE& hIns) {
 	nid.uVersion = NOTIFYICON_VERSION;
 	nid.uCallbackMessage = WM_TRAYMESSAGE;
 	loadTrayIcon();
-	LoadString(ins, IDS_APP_TITLE, nid.szTip, 128);
 	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 
 	// Shell_NotifyIcon may fail if the system tray icon is not fully initialized

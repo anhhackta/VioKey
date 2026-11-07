@@ -1,4 +1,4 @@
-/*----------------------------------------------------------
+﻿/*----------------------------------------------------------
 VioKey - Vietnamese Input Application for Windows.
 
 Based on OpenKey (https://github.com/tuyenvm/OpenKey)
@@ -91,7 +91,7 @@ void VioKeyHelper::registerRunOnStartup(const int& val) {
 		} else {
 			RegOpenKeyEx(HKEY_CURRENT_USER, _runOnStartupKeyPath, NULL, KEY_ALL_ACCESS, &hKey);
 			wstring path = getFullPath();
-			RegSetValueEx(hKey, _T("VioKey"), 0, REG_SZ, (byte*)path.c_str(), ((DWORD)path.size() + 1) * sizeof(TCHAR));
+			RegSetValueEx(hKey, _T("VioKey"), 0, REG_SZ, (BYTE*)path.c_str(), ((DWORD)path.size() + 1) * sizeof(TCHAR));
 			RegCloseKey(hKey);
 		}
 	} else {

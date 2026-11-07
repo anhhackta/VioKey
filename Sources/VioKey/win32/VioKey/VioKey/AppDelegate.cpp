@@ -17,6 +17,7 @@ int vLanguage = 1;
 int vInputType = 0;
 int vCheckSpelling = 1;
 int vUseModernOrthography = 1;
+int vQuickTelex = 0;
 #define DEFAULT_SWITCH_STATUS 0x5A00025A //default shift + z
 int vSwitchKeyStatus = DEFAULT_SWITCH_STATUS;
 int vRestoreIfWrongSpelling = 1;
@@ -31,13 +32,14 @@ int vTempOffSpelling = 0;
 int vAllowConsonantZFWJ = 0;
 int vQuickStartConsonant = 0;
 int vQuickEndConsonant = 0;
-int vTempOffOpenKey = 0;
+int vTempOffVioKey = 0;
 
 int vUseGrayIcon = 0;
 int vShowOnStartUp = 0;
 int vRunWithWindows = 1;
 
 int vRunAsAdmin = 0;
+int vThemeMode = 0;
 
 bool AppDelegate::isDialogMsg(MSG & msg) const {
 	return (mainDialog != NULL && IsDialogMessage(mainDialog->getHwnd(), &msg)) ||
@@ -67,6 +69,7 @@ int AppDelegate::run(HINSTANCE hInstance) {
 
 	//init VioKey Engine
 	VioKeyManager::initEngine();
+	UITheme::init();
 
 	//create system tray
 	SystemTrayHelper::createSystemTrayIcon(hInstance);
@@ -84,6 +87,7 @@ int AppDelegate::run(HINSTANCE hInstance) {
 			DispatchMessage(&msg);
 		}
 	}
+	UITheme::shutdown();
 	return 0;
 }
 
@@ -137,12 +141,15 @@ void AppDelegate::onDefaultConfig() {
 	APP_SET_DATA(vTempOffSpelling, 0);
 	APP_SET_DATA(vQuickStartConsonant, 0);
 	APP_SET_DATA(vQuickEndConsonant, 0);
-	APP_SET_DATA(vTempOffOpenKey, 0);
+	APP_SET_DATA(vTempOffVioKey, 0);
 
 	APP_SET_DATA(vUseGrayIcon, 0);
 	APP_SET_DATA(vShowOnStartUp, 0);
 	APP_SET_DATA(vRunWithWindows, 1);
 	APP_SET_DATA(vRunAsAdmin, 0);
+	APP_SET_DATA(vThemeMode, 0);
+	UITheme::setDarkMode(true);
+	applyThemeToOpenDialogs();
 
 	if (mainDialog) {
 		mainDialog->fillData();
@@ -218,4 +225,13 @@ void AppDelegate::onVioKeyExit() {
 	VioKeyManager::freeEngine();
 	SystemTrayHelper::removeSystemTray();
 	PostQuitMessage(0);
+}
+
+void AppDelegate::applyThemeToOpenDialogs() {
+	BaseDialog* dlgs[] = { mainDialog, macroDialog, aboutDialog };
+	for (BaseDialog* d : dlgs) {
+		if (d && d->getHwnd()) {
+			UITheme::refreshWindow(d->getHwnd());
+		}
+	}
 }
