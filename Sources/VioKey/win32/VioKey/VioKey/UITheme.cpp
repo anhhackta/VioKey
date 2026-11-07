@@ -19,6 +19,7 @@ using namespace Gdiplus;
 namespace {
 	struct ThemePalette {
 		COLORREF crBg;
+		COLORREF crSidebar;
 		COLORREF crCard;
 		COLORREF crPanel;
 		COLORREF crText;
@@ -28,9 +29,9 @@ namespace {
 		COLORREF crDwmBorder;
 
 		Color bg;
+		Color sidebar;
 		Color card;
 		Color cardBorder;
-		Color cardHighlight;
 		Color panel;
 		Color panelHover;
 		Color panelPressed;
@@ -52,8 +53,9 @@ namespace {
 	// SaaS 2026 Dark Palette (Linear / Raycast inspired obsidian + indigo-violet)
 	const ThemePalette DARK_PALETTE = {
 		RGB(0x0B, 0x0D, 0x13), // crBg
+		RGB(0x0F, 0x12, 0x1B), // crSidebar
 		RGB(0x13, 0x17, 0x22), // crCard
-		RGB(0x1C, 0x21, 0x30), // crPanel
+		RGB(0x1C, 0x22, 0x32), // crPanel
 		RGB(0xF8, 0xFA, 0xFC), // crText
 		RGB(0x94, 0xA3, 0xB8), // crTextMuted
 		RGB(0x47, 0x55, 0x69), // crTextDisabled
@@ -61,11 +63,11 @@ namespace {
 		RGB(0x22, 0x28, 0x3A), // crDwmBorder
 
 		Color(255, 0x0B, 0x0D, 0x13), // bg
+		Color(255, 0x0F, 0x12, 0x1B), // sidebar
 		Color(255, 0x13, 0x17, 0x22), // card
 		Color(255, 0x22, 0x28, 0x3A), // cardBorder
-		Color(28,  0xFF, 0xFF, 0xFF), // cardHighlight
-		Color(255, 0x1C, 0x21, 0x30), // panel
-		Color(255, 0x26, 0x2D, 0x40), // panelHover
+		Color(255, 0x1C, 0x22, 0x32), // panel
+		Color(255, 0x26, 0x2E, 0x42), // panelHover
 		Color(255, 0x17, 0x1B, 0x28), // panelPressed
 		Color(255, 0x2E, 0x36, 0x4F), // border
 		Color(255, 0x64, 0x74, 0x8B), // outline
@@ -73,7 +75,7 @@ namespace {
 		Color(255, 0x63, 0x66, 0xF1), // accent (#6366F1)
 		Color(255, 0x81, 0x8C, 0xF8), // accentHover
 		Color(255, 0x4F, 0x46, 0xE5), // accentPressed
-		Color(42,  0x63, 0x66, 0xF1), // accentSoft
+		Color(45,  0x63, 0x66, 0xF1), // accentSoft
 		Color(255, 0x31, 0x35, 0x6E), // accentDisabled
 		Color(255, 0xF8, 0x71, 0x71), // danger
 		Color(36,  0xEF, 0x44, 0x44), // dangerSoft
@@ -84,19 +86,20 @@ namespace {
 
 	// SaaS 2026 Light Palette (Vercel / Stripe inspired crisp Alabaster + pure white cards)
 	const ThemePalette LIGHT_PALETTE = {
-		RGB(0xF4, 0xF6, 0xFA), // crBg
+		RGB(0xF1, 0xF5, 0xF9), // crBg
+		RGB(0xF8, 0xFA, 0xFC), // crSidebar
 		RGB(0xFF, 0xFF, 0xFF), // crCard
 		RGB(0xF1, 0xF5, 0xF9), // crPanel
 		RGB(0x0F, 0x17, 0x2A), // crText
 		RGB(0x64, 0x74, 0x8B), // crTextMuted
 		RGB(0x94, 0xA3, 0xB8), // crTextDisabled
 		RGB(0x4F, 0x46, 0xE5), // crAccent (#4F46E5)
-		RGB(0xE2, 0xE8, 0xF0), // crDwmBorder
+		RGB(0xCB, 0xD5, 0xE1), // crDwmBorder
 
-		Color(255, 0xF4, 0xF6, 0xFA), // bg
+		Color(255, 0xF1, 0xF5, 0xF9), // bg
+		Color(255, 0xF8, 0xFA, 0xFC), // sidebar
 		Color(255, 0xFF, 0xFF, 0xFF), // card
 		Color(255, 0xE2, 0xE8, 0xF0), // cardBorder
-		Color(180, 0xFF, 0xFF, 0xFF), // cardHighlight
 		Color(255, 0xF1, 0xF5, 0xF9), // panel
 		Color(255, 0xE2, 0xE8, 0xF0), // panelHover
 		Color(255, 0xCB, 0xD5, 0xE1), // panelPressed
@@ -116,11 +119,12 @@ namespace {
 	};
 
 	// Layout metrics at 96 DPI
-	const float TOGGLE_WIDTH = 34.f;
-	const float TOGGLE_HEIGHT = 18.f;
+	const float TOGGLE_WIDTH = 33.f;
+	const float TOGGLE_HEIGHT = 17.5f;
 	const float TOGGLE_TEXT_GAP = 8.f;
 	const float BUTTON_RADIUS = 5.5f;
-	const float CARD_RADIUS = 7.5f;
+	const float CARD_RADIUS = 8.f;
+	const LONG SIDEBAR_WIDTH_DLU = 124;
 
 	const UINT_PTR SUBCLASS_ID = 1;
 	const wchar_t PROP_HOVER[] = L"VioKeyHover";
@@ -147,18 +151,22 @@ namespace {
 	const ThemePalette* pal = &DARK_PALETTE;
 	ULONG_PTR gdiplusToken = 0;
 	HBRUSH brushBg = NULL;
+	HBRUSH brushSidebar = NULL;
 	HBRUSH brushCard = NULL;
 	HBRUSH brushPanel = NULL;
 	HFONT fontTitle = NULL;
+	HFONT fontPageHeader = NULL;
 	HFONT fontSection = NULL;
 
-	enum class ButtonKind { Toggle, Chip, ModePill, ThemeBtn, Push, Tab };
+	enum class ButtonKind { Toggle, Chip, ModePill, ThemeBtn, Push, NavTab };
 
 	void rebuildBrushes() {
 		if (brushBg) DeleteObject(brushBg);
+		if (brushSidebar) DeleteObject(brushSidebar);
 		if (brushCard) DeleteObject(brushCard);
 		if (brushPanel) DeleteObject(brushPanel);
 		brushBg = CreateSolidBrush(pal->crBg);
+		brushSidebar = CreateSolidBrush(pal->crSidebar);
 		brushCard = CreateSolidBrush(pal->crCard);
 		brushPanel = CreateSolidBrush(pal->crPanel);
 	}
@@ -192,7 +200,7 @@ namespace {
 		if (id == IDC_BUTTON_THEME_TOGGLE)
 			return ButtonKind::ThemeBtn;
 		if (id >= IDC_TAB_BUTTON_GENERAL && id <= IDC_TAB_BUTTON_SYSTEM)
-			return ButtonKind::Tab;
+			return ButtonKind::NavTab;
 		if (id == IDC_CHECK_SWITCH_KEY_CTRL || id == IDC_CHECK_SWITCH_KEY_ALT ||
 			id == IDC_CHECK_SWITCH_KEY_WIN || id == IDC_CHECK_SWITCH_KEY_SHIFT)
 			return ButtonKind::Chip;
@@ -251,8 +259,8 @@ namespace {
 		float width = TOGGLE_WIDTH * scale, height = TOGGLE_HEIGHT * scale;
 		float top = rc.top + ((rc.bottom - rc.top) - height) / 2.f;
 		RectF track(rc.left + 1.f, top, width - 2.f, height - 1.f);
-		float inset = 3.2f * scale;
-		float thumbSize = checked ? 11.6f * scale : 10.2f * scale;
+		float inset = 3.1f * scale;
+		float thumbSize = checked ? 11.2f * scale : 9.8f * scale;
 		float thumbY = top + (height - 1.f - thumbSize) / 2.f;
 		float thumbX = checked ? track.GetRight() - inset - thumbSize + 0.5f : track.X + inset;
 
@@ -298,17 +306,18 @@ namespace {
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
 
 		RectF r(rc.left + 1.f, rc.top + 1.f, (float)(rc.right - rc.left) - 2.f, (float)(rc.bottom - rc.top) - 2.f);
-		float radius = r.Height / 2.f;
+		float radius = 5.f * scale;
 		COLORREF textColor = pal->crTextMuted;
 
 		if (checked) {
-			bool isViet = GetDlgCtrlID(hWnd) == IDC_RADIO_METHOD_VIETNAMESE;
-			Color fill = isViet ? (hover ? pal->accentHover : pal->accent) : (isDark ? Color(255, 0x33, 0x41, 0x55) : Color(255, 0x47, 0x55, 0x69));
+			int id = GetDlgCtrlID(hWnd);
+			bool isPrimary = (id == IDC_RADIO_METHOD_VIETNAMESE || id == IDC_RADIO_INPUT_TELEX || id == IDC_RADIO_INPUT_VNI);
+			Color fill = isPrimary ? (hover ? pal->accentHover : pal->accent) : (isDark ? Color(255, 0x33, 0x41, 0x55) : Color(255, 0x47, 0x55, 0x69));
 			fillRound(g, r, radius, fill);
 			textColor = RGB(0xFF, 0xFF, 0xFF);
 		} else {
-			fillRound(g, r, radius, hover ? pal->panelHover : pal->card);
-			strokeRound(g, r, radius, pal->cardBorder, 1.f);
+			fillRound(g, r, radius, hover ? pal->panelHover : pal->panel);
+			strokeRound(g, r, radius, pal->border, 1.f);
 			textColor = hover ? pal->crText : pal->crTextMuted;
 		}
 		if (!enabled) textColor = pal->crTextDisabled;
@@ -320,24 +329,21 @@ namespace {
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
 
 		RectF r(rc.left + 1.f, rc.top + 1.f, (float)(rc.right - rc.left) - 2.f, (float)(rc.bottom - rc.top) - 2.f);
-		float radius = r.Height / 2.f;
+		float radius = BUTTON_RADIUS * scale;
 
-		fillRound(g, r, radius, pressed ? pal->panelPressed : (hover ? pal->panelHover : pal->card));
-		strokeRound(g, r, radius, hover ? pal->accent : pal->cardBorder, 1.f);
+		fillRound(g, r, radius, pressed ? pal->panelPressed : (hover ? pal->panelHover : pal->panel));
+		strokeRound(g, r, radius, hover ? pal->accent : pal->border, 1.f);
 
-		// Draw crisp Sun or Moon icon on the left side of the pill
 		float cy = r.Y + r.Height / 2.f;
-		float cx = r.X + 10.f * scale;
+		float cx = r.X + 14.f * scale;
 		float ir = 4.2f * scale;
 
 		if (isDark) {
-			// Crescent moon in warm amber-violet
 			SolidBrush moonBrush(Color(255, 0xA5, 0xB4, 0xFC));
 			g.FillEllipse(&moonBrush, cx - ir, cy - ir, ir * 2.f, ir * 2.f);
-			SolidBrush cutBrush(pressed ? pal->panelPressed : (hover ? pal->panelHover : pal->card));
+			SolidBrush cutBrush(pressed ? pal->panelPressed : (hover ? pal->panelHover : pal->panel));
 			g.FillEllipse(&cutBrush, cx - ir * 0.2f, cy - ir * 1.15f, ir * 1.8f, ir * 1.8f);
 		} else {
-			// Sun disk with soft glow ring
 			SolidBrush glowBrush(Color(55, 0xF5, 0x9E, 0x0B));
 			g.FillEllipse(&glowBrush, cx - ir * 1.35f, cy - ir * 1.35f, ir * 2.7f, ir * 2.7f);
 			SolidBrush sunBrush(Color(255, 0xF5, 0x9E, 0x0B));
@@ -345,35 +351,62 @@ namespace {
 		}
 
 		RECT textRect = rc;
-		textRect.left = (LONG)(cx + 6.5f * scale);
-		drawLabelText(dc, hWnd, isDark ? L"Tối" : L"Sáng", textRect, pal->crText, DT_LEFT, fontSection);
+		textRect.left = (LONG)(cx + 8.f * scale);
+		drawLabelText(dc, hWnd, isDark ? L"Giao diện: Tối" : L"Giao diện: Sáng", textRect, pal->crText, DT_LEFT, fontSection);
 	}
 
-	void drawPush(HDC dc, HWND hWnd, const RECT& rc, ButtonKind kind, bool enabled, bool hover, bool pressed, float scale) {
+	void drawNavTab(HDC dc, HWND hWnd, const RECT& rc, bool selected, bool hover, bool pressed, float scale) {
+		Graphics g(dc);
+		g.SetSmoothingMode(SmoothingModeAntiAlias);
+
+		RectF r(rc.left + 1.f, rc.top + 1.f, (float)(rc.right - rc.left) - 2.f, (float)(rc.bottom - rc.top) - 2.f);
+		float radius = 6.f * scale;
+		COLORREF textColor = pal->crTextMuted;
+
+		if (selected) {
+			fillRound(g, r, radius, pal->accentSoft);
+			strokeRound(g, r, radius, pal->accent, 1.f);
+			// Left vertical accent pill indicator
+			RectF bar(r.X + 3.5f * scale, r.Y + r.Height * 0.24f, 3.f * scale, r.Height * 0.52f);
+			fillRound(g, bar, 1.5f * scale, pal->accent);
+			textColor = pal->crAccent;
+		} else if (hover || pressed) {
+			fillRound(g, r, radius, pressed ? pal->panelPressed : pal->panel);
+			textColor = pal->crText;
+		}
+
+		// Draw small geometric icon before text
+		int id = GetDlgCtrlID(hWnd);
+		float icx = r.X + 16.f * scale;
+		float icy = r.Y + r.Height / 2.f;
+		Pen iconPen(selected ? pal->accent : (hover ? Color(255, GetRValue(pal->crText), GetGValue(pal->crText), GetBValue(pal->crText)) : pal->outline), 1.5f * scale);
+		if (id == IDC_TAB_BUTTON_GENERAL) {
+			g.DrawEllipse(&iconPen, icx - 4.f * scale, icy - 4.f * scale, 8.f * scale, 8.f * scale);
+		} else if (id == IDC_TAB_BUTTON_MACRO) {
+			g.DrawLine(&iconPen, icx - 4.f * scale, icy - 2.5f * scale, icx + 4.f * scale, icy - 2.5f * scale);
+			g.DrawLine(&iconPen, icx - 4.f * scale, icy + 2.5f * scale, icx + 2.f * scale, icy + 2.5f * scale);
+		} else {
+			RectF box(icx - 4.f * scale, icy - 4.f * scale, 8.f * scale, 8.f * scale);
+			g.DrawRectangle(&iconPen, box.X, box.Y, box.Width, box.Height);
+		}
+
+		RECT textRect = rc;
+		textRect.left = (LONG)(icx + 10.f * scale);
+		drawLabel(dc, hWnd, textRect, textColor, DT_LEFT, selected ? fontSection : NULL);
+	}
+
+	void drawPush(HDC dc, HWND hWnd, const RECT& rc, bool enabled, bool hover, bool pressed, float scale) {
 		Graphics g(dc);
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
 
 		int id = GetDlgCtrlID(hWnd);
 		bool isDefault = (GetWindowLong(hWnd, GWL_STYLE) & BS_TYPEMASK) == BS_DEFPUSHBUTTON;
-		bool tabSelected = kind == ButtonKind::Tab && GetProp(hWnd, PROP_TAB_SELECTED) != NULL;
 		bool isDanger = (id == IDBUTTON_EXIT || id == IDC_BUTTON_DELETE);
 
 		RectF r(rc.left + 0.5f, rc.top + 0.5f, (float)(rc.right - rc.left) - 1.f, (float)(rc.bottom - rc.top) - 1.f);
 		COLORREF textColor = pal->crText;
 
-		if (kind == ButtonKind::Tab) {
-			if (tabSelected) {
-				fillRound(g, r, BUTTON_RADIUS * scale, pal->accentSoft);
-				strokeRound(g, r, BUTTON_RADIUS * scale, pal->accent, 1.2f * scale);
-				RectF bar(r.X + r.Width * 0.24f, r.GetBottom() - 2.4f * scale, r.Width * 0.52f, 2.0f * scale);
-				fillRound(g, bar, 1.0f * scale, pal->accent);
-				textColor = pal->crAccent;
-			} else {
-				if (hover || pressed)
-					fillRound(g, r, BUTTON_RADIUS * scale, pressed ? pal->panelPressed : pal->card);
-				textColor = hover ? pal->crText : pal->crTextMuted;
-			}
-		} else if (isDefault) {
+		if (isDefault) {
 			Color fill = !enabled ? pal->accentDisabled : (pressed ? pal->accentPressed : (hover ? pal->accentHover : pal->accent));
 			fillRound(g, r, BUTTON_RADIUS * scale, fill);
 			textColor = RGB(0xFF, 0xFF, 0xFF);
@@ -386,7 +419,7 @@ namespace {
 			strokeRound(g, r, BUTTON_RADIUS * scale, hover ? pal->outline : pal->border, 1.f);
 			if (!enabled) textColor = pal->crTextDisabled;
 		}
-		drawLabel(dc, hWnd, rc, textColor, DT_CENTER, (isDefault || tabSelected) ? fontSection : NULL);
+		drawLabel(dc, hWnd, rc, textColor, DT_CENTER, isDefault ? fontSection : NULL);
 	}
 
 	HBRUSH parentBrushFor(HWND hWnd) {
@@ -394,10 +427,15 @@ namespace {
 		if (parent && isTabPage(parent))
 			return brushCard;
 		int id = GetDlgCtrlID(hWnd);
-		if (id == IDC_CHECK_SWITCH_KEY_CTRL || id == IDC_CHECK_SWITCH_KEY_ALT ||
-			id == IDC_CHECK_SWITCH_KEY_WIN || id == IDC_CHECK_SWITCH_KEY_SHIFT ||
-			id == IDC_CHECK_SWITCH_KEY_BEEP)
+		if (id == IDC_RADIO_INPUT_TELEX || id == IDC_RADIO_INPUT_VNI ||
+			id == IDC_CHECK_SWITCH_KEY_CTRL || id == IDC_CHECK_SWITCH_KEY_ALT ||
+			id == IDC_CHECK_SWITCH_KEY_WIN || id == IDC_CHECK_SWITCH_KEY_SHIFT)
 			return brushCard;
+		if (id >= IDC_TAB_BUTTON_GENERAL && id <= IDC_TAB_BUTTON_SYSTEM)
+			return brushSidebar;
+		if (id == IDC_RADIO_METHOD_VIETNAMESE || id == IDC_RADIO_METHOD_ENGLISH ||
+			id == IDC_BUTTON_THEME_TOGGLE || id == IDBUTTON_OK)
+			return brushSidebar;
 		return brushBg;
 	}
 
@@ -419,13 +457,15 @@ namespace {
 		LRESULT state = SendMessage(hWnd, BM_GETSTATE, 0, 0);
 		bool pressed = (state & BST_PUSHED) != 0;
 		bool checked = SendMessage(hWnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
+		bool tabSelected = kind == ButtonKind::NavTab && GetProp(hWnd, PROP_TAB_SELECTED) != NULL;
 
 		switch (kind) {
 		case ButtonKind::Toggle:   drawToggle(mem, hWnd, rc, checked, enabled, hover, scale); break;
 		case ButtonKind::Chip:     drawChip(mem, hWnd, rc, checked, enabled, hover, scale); break;
 		case ButtonKind::ModePill: drawModePill(mem, hWnd, rc, checked, enabled, hover, scale); break;
 		case ButtonKind::ThemeBtn: drawThemeButton(mem, hWnd, rc, hover, pressed, scale); break;
-		default:                   drawPush(mem, hWnd, rc, kind, enabled, hover, pressed, scale); break;
+		case ButtonKind::NavTab:   drawNavTab(mem, hWnd, rc, tabSelected, hover, pressed, scale); break;
+		default:                   drawPush(mem, hWnd, rc, enabled, hover, pressed, scale); break;
 		}
 
 		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
@@ -490,22 +530,22 @@ namespace {
 			pAllowDarkModeForWindow(hChild, isDark);
 
 		int id = GetDlgCtrlID(hChild);
-		if (id == IDC_STATIC_SECTION_LEFT || id == IDC_STATIC_SECTION_RIGHT) {
+		if (id == IDC_STATIC_SECTION_LEFT || id == IDC_STATIC_SECTION_RIGHT || id == IDC_STATIC_APP_TITLE) {
 			SendMessage(hChild, WM_SETFONT, (WPARAM)fontSection, TRUE);
+		} else if (id == IDC_STATIC_PAGE_HEADER) {
+			SendMessage(hChild, WM_SETFONT, (WPARAM)fontPageHeader, TRUE);
 		}
 
 		if (classIs(hChild, L"Button")) {
 			LONG type = GetWindowLong(hChild, GWL_STYLE) & BS_TYPEMASK;
 			if (type != BS_GROUPBOX)
 				SetWindowSubclass(hChild, buttonProc, SUBCLASS_ID, 0);
-		} else if (classIs(hChild, L"ComboBox")) {
-			SetWindowTheme(hChild, isDark ? L"DarkMode_CFD" : L"Explorer", NULL);
 		} else if (classIs(hChild, L"Edit")) {
 			SetWindowTheme(hChild, isDark ? L"DarkMode_CFD" : L"Explorer", NULL);
 		} else if (classIs(hChild, WC_LISTVIEW)) {
 			SetWindowTheme(hChild, isDark ? L"DarkMode_Explorer" : L"Explorer", NULL);
-			ListView_SetBkColor(hChild, pal->crCard);
-			ListView_SetTextBkColor(hChild, pal->crCard);
+			ListView_SetBkColor(hChild, pal->crPanel);
+			ListView_SetTextBkColor(hChild, pal->crPanel);
 			ListView_SetTextColor(hChild, pal->crText);
 			HWND hHeader = ListView_GetHeader(hChild);
 			if (hHeader) {
@@ -544,9 +584,15 @@ void init() {
 	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0);
 	LOGFONT titleLog = metrics.lfMessageFont;
 	wcscpy_s(titleLog.lfFaceName, L"Segoe UI Semibold");
-	titleLog.lfHeight = (LONG)(titleLog.lfHeight * 1.55f);
+	titleLog.lfHeight = (LONG)(titleLog.lfHeight * 1.45f);
 	titleLog.lfWeight = FW_SEMIBOLD;
 	fontTitle = CreateFontIndirect(&titleLog);
+
+	LOGFONT pageLog = metrics.lfMessageFont;
+	wcscpy_s(pageLog.lfFaceName, L"Segoe UI Semibold");
+	pageLog.lfHeight = (LONG)(pageLog.lfHeight * 1.2f);
+	pageLog.lfWeight = FW_SEMIBOLD;
+	fontPageHeader = CreateFontIndirect(&pageLog);
 
 	LOGFONT secLog = metrics.lfMessageFont;
 	wcscpy_s(secLog.lfFaceName, L"Segoe UI Semibold");
@@ -556,12 +602,14 @@ void init() {
 
 void shutdown() {
 	if (brushBg) DeleteObject(brushBg);
+	if (brushSidebar) DeleteObject(brushSidebar);
 	if (brushCard) DeleteObject(brushCard);
 	if (brushPanel) DeleteObject(brushPanel);
 	if (fontTitle) DeleteObject(fontTitle);
+	if (fontPageHeader) DeleteObject(fontPageHeader);
 	if (fontSection) DeleteObject(fontSection);
-	brushBg = brushCard = brushPanel = NULL;
-	fontTitle = fontSection = NULL;
+	brushBg = brushSidebar = brushCard = brushPanel = NULL;
+	fontTitle = fontPageHeader = fontSection = NULL;
 	if (gdiplusToken) GdiplusShutdown(gdiplusToken);
 	gdiplusToken = 0;
 }
@@ -626,15 +674,36 @@ bool handleMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam, INT_PTR& r
 		Graphics g(dc);
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
 		if (tabPage) {
-			// Subtle vertical divider between the two columns
-			RECT mid = { 160, 8, 161, 122 };
-			MapDialogRect(hDlg, &mid);
-			Pen divPen(pal->cardBorder, 1.f);
-			g.DrawLine(&divPen, (INT)mid.left, (INT)mid.top, (INT)mid.left, (INT)mid.bottom);
-		} else if (GetDlgItem(hDlg, IDC_COMBO_INPUT_TYPE) != NULL) {
-			// Main dialog: draw Quick Config card and Tab Content card
-			drawCardRect(g, hDlg, 14, 42, 342, 89, scale);
-			drawCardRect(g, hDlg, 14, 119, 342, 253, scale);
+			// Header underline inside each tab page
+			RECT hdrLine = { 12, 36, 288, 37 };
+			MapDialogRect(hDlg, &hdrLine);
+			Pen linePen(pal->cardBorder, 1.f);
+			g.DrawLine(&linePen, (INT)hdrLine.left, (INT)hdrLine.top, (INT)hdrLine.right, (INT)hdrLine.top);
+
+			// Vertical divider between the two columns on Page 1 & Page 3
+			if (GetDlgItem(hDlg, IDC_CHECK_MODERN_ORTHORGRAPHY) != NULL) {
+				RECT mid = { 151, 42, 152, 188 };
+				MapDialogRect(hDlg, &mid);
+				g.DrawLine(&linePen, (INT)mid.left, (INT)mid.top, (INT)mid.left, (INT)mid.bottom);
+			} else if (GetDlgItem(hDlg, IDC_CHECK_RUN_WITH_WINDOWS) != NULL) {
+				RECT mid = { 151, 42, 152, 112 };
+				MapDialogRect(hDlg, &mid);
+				g.DrawLine(&linePen, (INT)mid.left, (INT)mid.top, (INT)mid.left, (INT)mid.bottom);
+				RECT infoLine = { 12, 118, 288, 119 };
+				MapDialogRect(hDlg, &infoLine);
+				g.DrawLine(&linePen, (INT)infoLine.left, (INT)infoLine.top, (INT)infoLine.right, (INT)infoLine.top);
+			}
+		} else if (GetDlgItem(hDlg, IDC_RADIO_INPUT_TELEX) != NULL) {
+			// Main dialog: draw Left Navigation Sidebar + Top Quick Bar Card + Right Workspace Card
+			RECT sideRect = { 0, 0, SIDEBAR_WIDTH_DLU, 300 };
+			MapDialogRect(hDlg, &sideRect);
+			sideRect.bottom = rc.bottom;
+			FillRect(dc, &sideRect, brushSidebar);
+			Pen borderPen(pal->cardBorder, 1.f);
+			g.DrawLine(&borderPen, (INT)sideRect.right, 0, (INT)sideRect.right, (INT)rc.bottom);
+
+			drawCardRect(g, hDlg, 134, 10, 436, 38, scale);
+			drawCardRect(g, hDlg, 134, 46, 436, 266, scale);
 		} else if (GetDlgItem(hDlg, IDC_STATIC_APP_CREDIT) != NULL) {
 			// About dialog: card around credit section
 			drawCardRect(g, hDlg, 14, 60, 254, 102, scale);
@@ -647,28 +716,31 @@ bool handleMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam, INT_PTR& r
 		HDC dc = (HDC)wParam;
 		HWND hCtrl = (HWND)lParam;
 		int id = GetDlgCtrlID(hCtrl);
-		bool isSection = (id == IDC_STATIC_SECTION_LEFT || id == IDC_STATIC_SECTION_RIGHT);
-		bool muted = (id == IDC_STATIC_SUBTITLE || id == IDC_STATIC_APP_SUB_TITLE ||
-			id == IDC_STATIC_APP_VERSION || id == IDC_STATIC_APP_CREDIT);
+		bool isSection = (id == IDC_STATIC_SECTION_LEFT || id == IDC_STATIC_SECTION_RIGHT || id == IDC_STATIC_APP_TITLE);
+		bool muted = (id == IDC_STATIC_SUBTITLE || id == IDC_STATIC_PAGE_DESC ||
+			id == IDC_STATIC_APP_SUB_TITLE || id == IDC_STATIC_APP_VERSION || id == IDC_STATIC_APP_CREDIT);
 
 		SetTextColor(dc, isSection ? pal->crAccent : (muted ? pal->crTextMuted : pal->crText));
 
-		bool onCard = tabPage;
-		if (!onCard && !isTabPage(hDlg)) {
-			RECT rcCtrl;
-			GetWindowRect(hCtrl, &rcCtrl);
-			MapWindowPoints(HWND_DESKTOP, hDlg, (LPPOINT)&rcCtrl, 2);
-			RECT card1 = { 14, 42, 342, 89 };
-			MapDialogRect(hDlg, &card1);
-			RECT cardAbout = { 14, 60, 254, 102 };
-			MapDialogRect(hDlg, &cardAbout);
-			if ((GetDlgItem(hDlg, IDC_COMBO_INPUT_TYPE) && rcCtrl.top >= card1.top && rcCtrl.bottom <= card1.bottom) ||
-				(!GetDlgItem(hDlg, IDC_COMBO_INPUT_TYPE) && GetDlgItem(hDlg, IDC_STATIC_APP_CREDIT) && rcCtrl.top >= cardAbout.top && rcCtrl.bottom <= cardAbout.bottom)) {
-				onCard = true;
-			}
+		if (tabPage) {
+			SetBkColor(dc, pal->crCard);
+			result = (INT_PTR)brushCard;
+			return true;
 		}
-		SetBkColor(dc, onCard ? pal->crCard : pal->crBg);
-		result = (INT_PTR)(onCard ? brushCard : brushBg);
+
+		RECT rcCtrl;
+		GetWindowRect(hCtrl, &rcCtrl);
+		MapWindowPoints(HWND_DESKTOP, hDlg, (LPPOINT)&rcCtrl, 2);
+		RECT sideRect = { 0, 0, SIDEBAR_WIDTH_DLU, 300 };
+		MapDialogRect(hDlg, &sideRect);
+
+		if (GetDlgItem(hDlg, IDC_RADIO_INPUT_TELEX) != NULL && rcCtrl.left < sideRect.right) {
+			SetBkColor(dc, pal->crSidebar);
+			result = (INT_PTR)brushSidebar;
+			return true;
+		}
+		SetBkColor(dc, pal->crCard);
+		result = (INT_PTR)brushCard;
 		return true;
 	}
 	case WM_CTLCOLOREDIT:
@@ -678,6 +750,27 @@ bool handleMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam, INT_PTR& r
 		SetBkColor(dc, pal->crPanel);
 		result = (INT_PTR)brushPanel;
 		return true;
+	}
+	case WM_NOTIFY: {
+		LPNMHDR hdr = (LPNMHDR)lParam;
+		if (hdr && hdr->code == NM_CUSTOMDRAW && classIs(hdr->hwndFrom, WC_LISTVIEW)) {
+			LPNMLVCUSTOMDRAW lvcd = (LPNMLVCUSTOMDRAW)lParam;
+			if (lvcd->nmcd.dwDrawStage == CDDS_PREPAINT) {
+				SetWindowLongPtr(hDlg, DWLP_MSGRESULT, CDRF_NOTIFYITEMDRAW);
+				result = TRUE;
+				return true;
+			}
+			if (lvcd->nmcd.dwDrawStage == CDDS_ITEMPREPAINT) {
+				bool selected = (ListView_GetItemState(hdr->hwndFrom, (int)lvcd->nmcd.dwItemSpec, LVIS_SELECTED) & LVIS_SELECTED) != 0;
+				lvcd->clrText = selected ? RGB(255, 255, 255) : pal->crText;
+				lvcd->clrTextBk = selected ? pal->crAccent : ((lvcd->nmcd.dwItemSpec % 2 == 0) ? pal->crPanel : pal->crCard);
+				lvcd->nmcd.uItemState &= ~(CDIS_SELECTED | CDIS_FOCUS);
+				SetWindowLongPtr(hDlg, DWLP_MSGRESULT, CDRF_NEWFONT);
+				result = TRUE;
+				return true;
+			}
+		}
+		break;
 	}
 	}
 	return false;

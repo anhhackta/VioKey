@@ -43,7 +43,6 @@ int vThemeMode = 0;
 
 bool AppDelegate::isDialogMsg(MSG & msg) const {
 	return (mainDialog != NULL && IsDialogMessage(mainDialog->getHwnd(), &msg)) ||
-		(macroDialog != NULL && IsDialogMessage(macroDialog->getHwnd(), &msg)) ||
 		(aboutDialog != NULL && IsDialogMessage(aboutDialog->getHwnd(), &msg));
 }
 
@@ -108,9 +107,6 @@ void AppDelegate::closeDialog(BaseDialog * dialog) {
 	} else if (aboutDialog == dialog) {
 		delete aboutDialog;
 		aboutDialog = NULL;
-	} else if (macroDialog == dialog) {
-		delete macroDialog;
-		macroDialog = NULL;
 	}
 }
 
@@ -193,11 +189,9 @@ void AppDelegate::onToggleUseMacro() {
 }
 
 void AppDelegate::onMacroTable() {
-	if (macroDialog == NULL) {
-		macroDialog = new MacroDialog(hInstance, IDD_DIALOG_MACRO);
-		macroDialog->show();
-	} else {
-		macroDialog->bringOnTop();
+	createMainDialog();
+	if (mainDialog) {
+		mainDialog->selectTab(1);
 	}
 }
 
@@ -228,7 +222,7 @@ void AppDelegate::onVioKeyExit() {
 }
 
 void AppDelegate::applyThemeToOpenDialogs() {
-	BaseDialog* dlgs[] = { mainDialog, macroDialog, aboutDialog };
+	BaseDialog* dlgs[] = { mainDialog, aboutDialog };
 	for (BaseDialog* d : dlgs) {
 		if (d && d->getHwnd()) {
 			UITheme::refreshWindow(d->getHwnd());

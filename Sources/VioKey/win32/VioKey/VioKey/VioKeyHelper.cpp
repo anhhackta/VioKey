@@ -1,4 +1,4 @@
-﻿/*----------------------------------------------------------
+/*----------------------------------------------------------
 VioKey - Vietnamese Input Application for Windows.
 
 Based on OpenKey (https://github.com/tuyenvm/OpenKey)
@@ -126,7 +126,8 @@ string& VioKeyHelper::getFrontMostAppExecuteName() {
 		return _unknownProgram;
 	}
 	_exeName = _tcsrchr(_exePath, '\\') + 1;
-	if (wcscmp(_exeName, _T("VioKey64.exe")) == 0 ||
+	if (wcscmp(_exeName, _T("VioKey.exe")) == 0 ||
+		wcscmp(_exeName, _T("VioKey64.exe")) == 0 ||
 		wcscmp(_exeName, _T("VioKey32.exe")) == 0 ||
 		wcscmp(_exeName, _T("explorer.exe")) == 0) {
 		return _exeNameUtf8;

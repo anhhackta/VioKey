@@ -24,11 +24,8 @@
 Yêu cầu **Visual Studio 2022** (hoặc VS2022 Build Tools) với gói C++ Desktop:
 
 ```powershell
-# Bản 64-bit (VioKey64.exe)
+# Biên dịch ra 1 file thực thi duy nhất: Sources\VioKey\win32\VioKey\x64\Release\VioKey.exe
 MSBuild.exe Sources\VioKey\win32\VioKey\VioKey.sln -m -t:Rebuild -p:Configuration=Release -p:Platform=x64
-
-# Bản 32-bit (VioKey32.exe)
-MSBuild.exe Sources\VioKey\win32\VioKey\VioKey.sln -m -t:Rebuild -p:Configuration=Release -p:Platform=x86
 ```
 
 ## Cấu trúc mã nguồn

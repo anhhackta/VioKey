@@ -1,4 +1,4 @@
-/*----------------------------------------------------------
+﻿/*----------------------------------------------------------
 VioKey - Vietnamese Input Application for Windows.
 
 Based on OpenKey (https://github.com/tuyenvm/OpenKey)

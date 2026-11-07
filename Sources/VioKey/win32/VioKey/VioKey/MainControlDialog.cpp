@@ -1,21 +1,21 @@
 /*----------------------------------------------------------
 VioKey - Vietnamese Input Application for Windows.
-
-Based on OpenKey (https://github.com/tuyenvm/OpenKey)
-Copyright (C) 2019 Mai Vu Tuyen - GPL license
-
-VioKey is a simplified fork: Telex/VNI only, Unicode only.
-You can fork, modify, improve this program. If you
-redistribute your new version, it MUST be open source.
+Released under the GPLv3 license.
 -----------------------------------------------------------*/
 #include "MainControlDialog.h"
 #include "AppDelegate.h"
 #include <Shlobj.h>
+#include <commdlg.h>
 
 #define EMPTY_SWITCH_KEY 0xFE
+#define MAX_MACRO_BUFFER 4096
+#define BTN_ADD_TEXT _T("+ Thêm")
+#define BTN_UPDATE_TEXT _T("Lưu")
 
-// Design-time (dialog unit) rectangle where the tab pages are placed (inside the lower card).
-static const RECT PAGE_AREA_DLU = { 16, 121, 340, 251 };
+static const wchar_t PROJECT_SOURCE_URL[] = L"https://github.com/tuyenvm/OpenKey";
+
+// Design-time (dialog unit) rectangle for the right content workspace card.
+static const RECT PAGE_AREA_DLU = { 136, 48, 434, 264 };
 
 MainControlDialog::MainControlDialog(const HINSTANCE& hInstance, const int& resourceId)
     : BaseDialog(hInstance, resourceId) {
@@ -27,7 +27,6 @@ MainControlDialog::~MainControlDialog() {
 void MainControlDialog::initDialog() {
     SET_DIALOG_ICON(IDI_APP_ICON);
 
-    //set title version
     TCHAR title[256];
     TCHAR titleBuffer[256];
     LoadString(hInstance, IDS_MAIN_DIALOG_TITLE, title, 256);
@@ -36,18 +35,11 @@ void MainControlDialog::initDialog() {
 
     SendDlgItemMessage(hDlg, IDC_STATIC_TITLE, WM_SETFONT, (WPARAM)UITheme::titleFont(), TRUE);
 
-    //input type
-    comboBoxInputType = GetDlgItem(hDlg, IDC_COMBO_INPUT_TYPE);
-    vector<LPCTSTR>& inputType = VioKeyManager::getInputType();
-    for (size_t i = 0; i < inputType.size(); i++) {
-        SendMessage(comboBoxInputType, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(inputType[i]));
-    }
-
     createTabs();
     bindControls();
+    initMacroList();
     addTooltips();
 
-    //capture the switch key ourselves instead of letting the edit box show raw text
     SetWindowSubclass(textSwitchKey, switchKeyProc, 1, (DWORD_PTR)this);
 
     fillData();
@@ -70,12 +62,13 @@ void MainControlDialog::createTabs() {
 }
 
 void MainControlDialog::bindControls() {
+    radioTelex = GetDlgItem(hDlg, IDC_RADIO_INPUT_TELEX);
+    radioVNI = GetDlgItem(hDlg, IDC_RADIO_INPUT_VNI);
     checkCtrl = GetDlgItem(hDlg, IDC_CHECK_SWITCH_KEY_CTRL);
     checkAlt = GetDlgItem(hDlg, IDC_CHECK_SWITCH_KEY_ALT);
     checkWin = GetDlgItem(hDlg, IDC_CHECK_SWITCH_KEY_WIN);
     checkShift = GetDlgItem(hDlg, IDC_CHECK_SWITCH_KEY_SHIFT);
     textSwitchKey = GetDlgItem(hDlg, IDC_SWITCH_KEY_KEY);
-    checkBeep = GetDlgItem(hDlg, IDC_CHECK_SWITCH_KEY_BEEP);
     checkVietnamese = GetDlgItem(hDlg, IDC_RADIO_METHOD_VIETNAMESE);
     checkEnglish = GetDlgItem(hDlg, IDC_RADIO_METHOD_ENGLISH);
 
@@ -89,14 +82,19 @@ void MainControlDialog::bindControls() {
     checkSmartSwitchKey = GetDlgItem(general, IDC_CHECK_SMART_SWITCH_KEY);
     checkCapsFirstChar = GetDlgItem(general, IDC_CHECK_CAPS_FIRST_CHAR);
     checkTempOffVioKey = GetDlgItem(general, IDC_CHECK_TEMP_OFF_VIOKEY);
+    checkQuickTelex = GetDlgItem(general, IDC_CHECK_QUICK_TELEX);
+    checkQuickStartConsonant = GetDlgItem(general, IDC_CHECK_QUICK_START_CONSONANT);
+    checkQuickEndConsonant = GetDlgItem(general, IDC_CHECK_QUICK_END_CONSONANT);
+    checkBeep = GetDlgItem(general, IDC_CHECK_SWITCH_KEY_BEEP);
 
     HWND macro = hTabPages[1];
-    checkQuickTelex = GetDlgItem(macro, IDC_CHECK_QUICK_TELEX);
     checkUseMacro = GetDlgItem(macro, IDC_CHECK_USE_MACRO);
     checkUseMacroInEnglish = GetDlgItem(macro, IDC_CHECK_USE_MACRO_IN_ENGLISH);
     checkMacroAutoCaps = GetDlgItem(macro, IDC_CHECK_AUTO_CAPS);
-    checkQuickStartConsonant = GetDlgItem(macro, IDC_CHECK_QUICK_START_CONSONANT);
-    checkQuickEndConsonant = GetDlgItem(macro, IDC_CHECK_QUICK_END_CONSONANT);
+    listMacro = GetDlgItem(macro, IDC_LIST_MACRO_DATA);
+    hMacroName = GetDlgItem(macro, IDC_EDIT_MACRO_NAME);
+    hMacroContent = GetDlgItem(macro, IDC_EDIT_MACRO_CONTENT);
+    hAddButton = GetDlgItem(macro, IDC_BUTTON_ADD);
 
     HWND system = hTabPages[2];
     checkShowOnStartup = GetDlgItem(system, IDC_CHECK_SHOW_ON_STARTUP);
@@ -104,10 +102,40 @@ void MainControlDialog::bindControls() {
     checkRunAsAdmin = GetDlgItem(system, IDC_CHECK_RUN_AS_ADMIN);
     checkModernIcon = GetDlgItem(system, IDC_CHECK_MODERN_ICON);
     checkUseClipboard = GetDlgItem(system, IDC_CHECK_USE_CLIPBOARD);
+
+    wchar_t verBuffer[256];
+    wsprintfW(verBuffer, _T("Phiên bản %s • Kiến trúc 64-bit Single-Binary (%s)"),
+        VioKeyHelper::getVersionString().c_str(), _T(__DATE__));
+    SetDlgItemText(system, IDC_STATIC_APP_VERSION, verBuffer);
+}
+
+void MainControlDialog::initMacroList() {
+    RECT rcList = { 0 };
+    GetClientRect(listMacro, &rcList);
+    RECT rcCol0 = { 0, 0, 72, 10 };
+    MapDialogRect(hTabPages[1], &rcCol0);
+    int col0Width = rcCol0.right;
+    int col1Width = (rcList.right - rcList.left) - col0Width - GetSystemMetrics(SM_CXVSCROLL) - 4;
+    if (col1Width < 180) col1Width = 260;
+
+    LVCOLUMN col = { 0 };
+    col.mask = LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
+    col.pszText = (LPWSTR)_T("Từ viết tắt");
+    col.cx = col0Width;
+
+    SendMessage(listMacro, LVM_SETEXTENDEDLISTVIEWSTYLE,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+    SendMessage(listMacro, LVM_INSERTCOLUMN, 0, (LPARAM)&col);
+
+    col.pszText = (LPWSTR)_T("Nội dung thay thế");
+    col.cx = col1Width;
+    SendMessage(listMacro, LVM_INSERTCOLUMN, 1, (LPARAM)&col);
 }
 
 void MainControlDialog::addTooltips() {
-    createToolTip(comboBoxInputType, IDS_STRING_INPUT);
+    createToolTip(radioTelex, IDS_STRING_INPUT);
+    createToolTip(radioVNI, IDS_STRING_INPUT);
     createToolTip(checkCtrl, IDS_STRING_CTRL);
     createToolTip(checkAlt, IDS_STRING_ALT);
     createToolTip(checkWin, IDS_STRING_WIN);
@@ -169,9 +197,6 @@ INT_PTR MainControlDialog::eventProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
             }
             break;
         }
-        case IDC_BUTTON_MACRO_TABLE:
-            AppDelegate::getInstance()->onMacroTable();
-            break;
         case IDC_TAB_BUTTON_GENERAL:
             selectTab(0);
             break;
@@ -185,14 +210,40 @@ INT_PTR MainControlDialog::eventProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
             UITheme::toggleDarkMode();
             AppDelegate::getInstance()->applyThemeToOpenDialogs();
             break;
+        case IDC_BUTTON_ADD:
+            onAddMacroButton();
+            break;
+        case IDC_BUTTON_DELETE:
+            onDeleteMacroButton();
+            break;
+        case IDC_BUTTON_IMPORT_MACRO:
+            onImportMacroButton();
+            break;
+        case IDC_BUTTON_EXPORT_MACRO:
+            onExportMacroButton();
+            break;
+        case IDC_BUTTON_GO_SOURCE_CODE:
+            ShellExecute(NULL, _T("open"), PROJECT_SOURCE_URL, NULL, NULL, SW_SHOWNORMAL);
+            break;
         default:
-            if (HIWORD(wParam) == CBN_SELCHANGE) {
-                this->onComboBoxSelected((HWND)lParam);
+            if (HIWORD(wParam) == EN_CHANGE && (HWND)lParam == hMacroName) {
+                TCHAR buffer[128];
+                GetWindowText(hMacroName, buffer, 128);
+                SetWindowText(hAddButton, hasMacro(wideStringToUtf8(buffer)) ? BTN_UPDATE_TEXT : BTN_ADD_TEXT);
             }
             else if (HIWORD(wParam) == BN_CLICKED) {
                 this->onCheckboxClicked((HWND)lParam);
             }
             break;
+        }
+        break;
+    }
+    case WM_NOTIFY: {
+        LPNMHDR hdr = (LPNMHDR)lParam;
+        if (hdr->idFrom == IDC_LIST_MACRO_DATA && hdr->code == LVN_ITEMCHANGED) {
+            NMLISTVIEW* pView = (NMLISTVIEW*)lParam;
+            if (pView->uNewState & LVIS_SELECTED)
+                onSelectMacroItem(pView->iItem);
         }
         break;
     }
@@ -244,7 +295,10 @@ LRESULT CALLBACK MainControlDialog::switchKeyProc(HWND hWnd, UINT msg, WPARAM wP
 }
 
 void MainControlDialog::fillData() {
-    SendMessage(comboBoxInputType, CB_SETCURSEL, vInputType, 0);
+    SendMessage(radioTelex, BM_SETCHECK, vInputType == 0 ? 1 : 0, 0);
+    SendMessage(radioVNI, BM_SETCHECK, vInputType == 1 ? 1 : 0, 0);
+    InvalidateRect(radioTelex, NULL, FALSE);
+    InvalidateRect(radioVNI, NULL, FALSE);
 
     SendMessage(checkCtrl, BM_SETCHECK, HAS_CONTROL(vSwitchKeyStatus) ? 1 : 0, 0);
     SendMessage(checkAlt, BM_SETCHECK, HAS_OPTION(vSwitchKeyStatus) ? 1 : 0, 0);
@@ -284,6 +338,8 @@ void MainControlDialog::fillData() {
     EnableWindow(checkRestoreIfWrongSpelling, vCheckSpelling);
     EnableWindow(checkAllowZWJF, vCheckSpelling);
     EnableWindow(checkTempOffSpelling, vCheckSpelling);
+
+    reloadMacroList();
 }
 
 void MainControlDialog::setSwitchKey(const unsigned short& code) {
@@ -301,14 +357,6 @@ void MainControlDialog::selectTab(const int& index) {
     }
 }
 
-void MainControlDialog::onComboBoxSelected(const HWND& hCombobox) {
-    if (hCombobox == comboBoxInputType) {
-        APP_SET_DATA(vInputType, (int)SendMessage(hCombobox, CB_GETCURSEL, 0, 0));
-    }
-    SystemTrayHelper::updateData();
-}
-
-// Updates one modifier bit of the language switch hotkey.
 static void setSwitchKeyModifier(HWND hCheck, const int& mask) {
     int checked = (int)SendMessage(hCheck, BM_GETCHECK, 0, 0) ? 1 : 0;
     vSwitchKeyStatus &= ~mask;
@@ -317,14 +365,20 @@ static void setSwitchKeyModifier(HWND hCheck, const int& mask) {
     APP_SET_DATA(vSwitchKeyStatus, vSwitchKeyStatus);
 }
 
-// Reads a checkbox into an engine/app setting.
 #define BIND_CHECK(HANDLE, SETTING) \
     else if (hWnd == HANDLE) { \
         APP_SET_DATA(SETTING, (int)SendMessage(hWnd, BM_GETCHECK, 0, 0) ? 1 : 0); \
     }
 
 void MainControlDialog::onCheckboxClicked(const HWND& hWnd) {
-    if (hWnd == checkCtrl) {
+    if (hWnd == radioTelex || hWnd == radioVNI) {
+        APP_SET_DATA(vInputType, hWnd == radioVNI ? 1 : 0);
+        SendMessage(radioTelex, BM_SETCHECK, vInputType == 0 ? 1 : 0, 0);
+        SendMessage(radioVNI, BM_SETCHECK, vInputType == 1 ? 1 : 0, 0);
+        InvalidateRect(radioTelex, NULL, FALSE);
+        InvalidateRect(radioVNI, NULL, FALSE);
+    }
+    else if (hWnd == checkCtrl) {
         setSwitchKeyModifier(hWnd, 0x100);
     }
     else if (hWnd == checkAlt) {
@@ -366,7 +420,6 @@ void MainControlDialog::onCheckboxClicked(const HWND& hWnd) {
         requestRestartAsAdmin();
     }
     else if (hWnd == checkUseClipboard) {
-        // checked = paste through clipboard, i.e. NOT step by step
         APP_SET_DATA(vSendKeyStepByStep, (int)SendMessage(hWnd, BM_GETCHECK, 0, 0) ? 0 : 1);
     }
     BIND_CHECK(checkModernOrthorgraphy, vUseModernOrthography)
@@ -416,12 +469,129 @@ void MainControlDialog::setSwitchKeyText(const HWND& hWnd, const UINT16& keyCode
     }
 }
 
+void MainControlDialog::reloadMacroList() {
+    if (!listMacro) return;
+    SendMessage(listMacro, LVM_DELETEALLITEMS, 0, 0);
+    getAllMacro(keys, macroText, macroContent);
+    for (size_t i = 0; i < macroText.size(); i++) {
+        wstring nameW = utf8ToWideString(macroText[macroText.size() - 1 - i]);
+        wstring contentW = utf8ToWideString(macroContent[macroText.size() - 1 - i]);
+        insertMacroRow((int)i, (LPTSTR)nameW.c_str(), (LPTSTR)contentW.c_str());
+    }
+}
+
+void MainControlDialog::saveAndReloadMacros() {
+    vector<Byte> macroData;
+    getMacroSaveData(macroData);
+    VioKeyHelper::setRegBinary(_T("macroData"), macroData.data(), (int)macroData.size());
+    reloadMacroList();
+}
+
+void MainControlDialog::insertMacroRow(const int& index, LPTSTR macroName, LPTSTR macroContent) {
+    LV_ITEM item = { 0 };
+    item.mask = LVIF_TEXT;
+    item.cchTextMax = 256;
+    item.iItem = index;
+    item.iSubItem = 0;
+    item.pszText = macroName;
+    SendMessage(listMacro, LVM_INSERTITEM, 0, (LPARAM)&item);
+
+    item.iSubItem = 1;
+    item.pszText = macroContent;
+    SendMessage(listMacro, LVM_SETITEM, 0, (LPARAM)&item);
+}
+
+void MainControlDialog::onSelectMacroItem(const int& index) {
+    if (index < 0 || (size_t)index >= macroText.size()) return;
+    SetWindowText(hMacroName, utf8ToWideString(macroText[macroText.size() - 1 - index]).c_str());
+    SetWindowText(hMacroContent, utf8ToWideString(macroContent[macroText.size() - 1 - index]).c_str());
+    SetWindowText(hAddButton, BTN_UPDATE_TEXT);
+}
+
+void MainControlDialog::onAddMacroButton() {
+    TCHAR buffer[MAX_MACRO_BUFFER];
+    GetWindowText(hMacroName, buffer, MAX_MACRO_BUFFER);
+    wstring name = buffer;
+    GetWindowText(hMacroContent, buffer, MAX_MACRO_BUFFER);
+    wstring content = buffer;
+
+    if (name.empty() || content.empty()) {
+        MessageBox(hDlg, _T("Vui lòng nhập từ viết tắt và nội dung thay thế!"), _T("VioKey"), MB_OK);
+        return;
+    }
+
+    addMacro(wideStringToUtf8(name), wideStringToUtf8(content));
+    SetWindowText(hMacroName, _T(""));
+    SetWindowText(hMacroContent, _T(""));
+    SetWindowText(hAddButton, BTN_ADD_TEXT);
+    saveAndReloadMacros();
+    SetFocus(hMacroName);
+}
+
+void MainControlDialog::onDeleteMacroButton() {
+    TCHAR buffer[MAX_MACRO_BUFFER];
+    GetWindowText(hMacroName, buffer, MAX_MACRO_BUFFER);
+    wstring name = buffer;
+
+    if (name.empty()) {
+        MessageBox(hDlg, _T("Hãy chọn một từ viết tắt trong danh sách để xóa!"), _T("VioKey"), MB_OK);
+        return;
+    }
+
+    if (deleteMacro(wideStringToUtf8(name))) {
+        saveAndReloadMacros();
+        SetWindowText(hMacroName, _T(""));
+        SetWindowText(hMacroContent, _T(""));
+        SetFocus(hMacroName);
+    }
+    SetWindowText(hAddButton, BTN_ADD_TEXT);
+}
+
+void MainControlDialog::onImportMacroButton() {
+    OPENFILENAME ofn = { 0 };
+    TCHAR szFile[MAX_PATH] = { 0 };
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hDlg;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = _T("Text file (*.txt)\0*.txt\0All (*.*)\0*.*\0");
+    ofn.nFilterIndex = 1;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+    if (GetOpenFileName(&ofn) == TRUE) {
+        int msgboxID = MessageBox(
+            hDlg,
+            _T("Bạn có muốn giữ lại các từ gõ tắt hiện có không?"),
+            _T("Nạp bảng gõ tắt"),
+            MB_ICONEXCLAMATION | MB_YESNO
+        );
+        readFromFile(wideStringToUtf8(ofn.lpstrFile), msgboxID == IDYES);
+        saveAndReloadMacros();
+    }
+}
+
+void MainControlDialog::onExportMacroButton() {
+    OPENFILENAME ofn = { 0 };
+    TCHAR szFile[MAX_PATH] = _T("VioKeyMacro");
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hDlg;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = _T("Text file (*.txt)\0*.txt\0");
+    ofn.nFilterIndex = 1;
+    ofn.lpstrDefExt = L"txt";
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+    if (GetSaveFileName(&ofn) == TRUE) {
+        saveToFile(wideStringToUtf8(ofn.lpstrFile));
+    }
+}
+
 void MainControlDialog::requestRestartAsAdmin() {
     VioKeyHelper::registerRunOnStartup(false);
     if (vRunAsAdmin && !IsUserAnAdmin()) {
         int msgboxID = MessageBox(
             hDlg,
-            _T("Bạn cần phải khởi động lại VioKey để kích hoạt chế độ Admin!\nBạn có muốn khởi động lại VioKey không?"),
+            _T("Bạn cần khởi động lại VioKey để kích hoạt quyền Admin (hỗ trợ gõ trong Game).\nKhởi động lại ngay?"),
             _T("VioKey"),
             MB_ICONEXCLAMATION | MB_YESNO
         );

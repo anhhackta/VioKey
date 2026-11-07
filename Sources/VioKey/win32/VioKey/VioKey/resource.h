@@ -8,10 +8,9 @@
 #define IDI_ICON_STATUS_VIET_10         136
 #define IDI_ICON_STATUS_ENG_10          137
 
-// Dialogs
+// Dialogs (single-window sidebar architecture + About popup)
 #define IDD_ABOUTBOX                    103
 #define IDD_DIALOG_MAIN                 104
-#define IDD_DIALOG_MACRO                141
 #define IDD_DIALOG_TAB_GENERAL          145
 #define IDD_DIALOG_TAB_MACRO            146
 #define IDD_DIALOG_TAB_SYSTEM           147
@@ -58,9 +57,10 @@
 #define ID_BTN_DEFAULT                  1023
 #define IDC_STATIC                      -1
 
-// Main dialog
-#define IDC_COMBO_INPUT_TYPE            1000
+// Main dialog (sidebar + top bar)
+#define IDC_RADIO_INPUT_TELEX           1000
 #define IDC_CHECK_SWITCH_KEY_CTRL       1001
+#define IDC_RADIO_INPUT_VNI             1002
 #define IDC_CHECK_SWITCH_KEY_ALT        1003
 #define IDC_CHECK_SWITCH_KEY_WIN        1004
 #define IDC_CHECK_SWITCH_KEY_SHIFT      1005
@@ -76,8 +76,10 @@
 #define IDC_STATIC_SECTION_LEFT         1065
 #define IDC_STATIC_SECTION_RIGHT        1066
 #define IDC_BUTTON_THEME_TOGGLE         1067
+#define IDC_STATIC_PAGE_HEADER          1068
+#define IDC_STATIC_PAGE_DESC            1069
 
-// Tab: general
+// Page 1: Typing & Spelling
 #define IDC_CHECK_MODERN_ORTHORGRAPHY   1010
 #define IDC_CHECK_SPELLING              1011
 #define IDC_CHECK_RESTORE_IF_WRONG_SPELLING 1012
@@ -87,33 +89,30 @@
 #define IDC_CHECK_TEMP_OFF_SPELLING     1025
 #define IDC_CHECK_ALLOW_ZJWF            1026
 #define IDC_CHECK_TEMP_OFF_VIOKEY       1027
-
-// Tab: macro
 #define IDC_CHECK_QUICK_TELEX           1019
-#define IDC_CHECK_USE_MACRO             1020
-#define IDC_CHECK_USE_MACRO_IN_ENGLISH  1021
-#define IDC_BUTTON_MACRO_TABLE          1022
 #define IDC_CHECK_QUICK_START_CONSONANT 1028
 #define IDC_CHECK_QUICK_END_CONSONANT   1029
-#define IDC_CHECK_AUTO_CAPS             1030
 
-// Tab: system
+// Page 2: Macro Manager (integrated)
+#define IDC_CHECK_USE_MACRO             1020
+#define IDC_CHECK_USE_MACRO_IN_ENGLISH  1021
+#define IDC_CHECK_AUTO_CAPS             1030
+#define IDC_EDIT_MACRO_NAME             1031
+#define IDC_BUTTON_ADD                  1032
+#define IDC_LIST_MACRO_DATA             1038
+#define IDC_EDIT_MACRO_CONTENT          1042
+#define IDC_BUTTON_DELETE               1043
+#define IDC_BUTTON_IMPORT_MACRO         1044
+#define IDC_BUTTON_EXPORT_MACRO         1045
+
+// Page 3: System & Info
 #define IDC_CHECK_SHOW_ON_STARTUP       1014
 #define IDC_CHECK_RUN_WITH_WINDOWS      1015
 #define IDC_CHECK_USE_CLIPBOARD         1016
 #define IDC_CHECK_MODERN_ICON           1024
 #define IDC_CHECK_RUN_AS_ADMIN          1048
 
-// Macro dialog
-#define IDC_LIST_MACRO_DATA             1038
-#define IDC_EDIT_MACRO_NAME             1031
-#define IDC_EDIT_MACRO_CONTENT          1042
-#define IDC_BUTTON_ADD                  1032
-#define IDC_BUTTON_DELETE               1043
-#define IDC_BUTTON_IMPORT_MACRO         1044
-#define IDC_BUTTON_EXPORT_MACRO         1045
-
-// About dialog
+// About & Version Info
 #define IDC_STATIC_APP_TITLE            1034
 #define IDC_STATIC_APP_SUB_TITLE        1035
 #define IDC_STATIC_APP_VERSION          1036

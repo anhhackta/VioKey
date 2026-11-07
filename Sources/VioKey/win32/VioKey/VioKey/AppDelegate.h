@@ -1,24 +1,18 @@
 /*----------------------------------------------------------
 VioKey - Vietnamese Input Application for Windows.
-
-Based on OpenKey (https://github.com/tuyenvm/OpenKey)
-Copyright (C) 2019 Mai Vu Tuyen - GPL license
-
-VioKey is a simplified fork: Telex/VNI only, Unicode only.
-You can fork, modify, improve this program. If you
-redistribute your new version, it MUST be open source.
+Released under the GPLv3 license.
 -----------------------------------------------------------*/
 #pragma once
 #include "stdafx.h"
 #include "MainControlDialog.h"
 #include "AboutDialog.h"
-#include "MacroDialog.h"
 
 class BaseDialog;
 class AppDelegate {
 private:
 	HINSTANCE hInstance;
-	BaseDialog* mainDialog = NULL, *aboutDialog = NULL, *macroDialog = NULL;
+	MainControlDialog* mainDialog = NULL;
+	BaseDialog* aboutDialog = NULL;
 private:
 	bool isDialogMsg(MSG &msg) const;
 public:
